@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 
 import { connect } from '../database';
 import { Post } from '../interface/post.interface';
+import { QueryError } from 'mysql2';
 
 export async function getAll(req: Request, res: Response): Promise<Response | void> {
     const conn = await connect();
@@ -19,7 +20,15 @@ export async function createPost(req: Request, res: Response) {
     }
 
     const conn = await connect();
-    await conn.query('INSERT INTO posts SET ?', [newPost]);
+
+    try {
+        await conn.query('INSERT INTO posts SET ?', [newPost]);
+    } catch (e: any) {
+        return res.json({
+            message: e.sqlMessage,
+        }).status(400);
+    }
+
     return res.json({
         message: 'success',
     }).status(201);
@@ -50,14 +59,21 @@ export async function deletePost(req: Request, res: Response) {
         }).status(404);
     }
 
-    await conn.query('DELETE FROM posts WHERE id = ?', [id]);
+    try {
+        await conn.query('DELETE FROM posts WHERE id = ?', [id]);
+    } catch (e: any) {
+        return res.json({
+            message: e.sqlMessage,
+        }).status(400);
+    }
+
     return res.json({
         message: 'success',
     }).status(200);
 }
 
 export async function updatePost(req: Request, res: Response) {
-    const id = req.params.postId;
+    const id = req.params.id;
     const conn = await connect();
     const post = await conn.query('SELECT * FROM posts WHERE id = ?', [id]);
 
@@ -68,8 +84,16 @@ export async function updatePost(req: Request, res: Response) {
     }
 
     const updatePost: Post = req.body;
-    await conn.query('UPDATE posts set ? WHERE id = ?', [updatePost, id]);
-    return res.json({
-        message: 'success',
-    }).status(200);
+
+    try {
+        await conn.query('UPDATE posts set ? WHERE id = ?', [updatePost, id]);
+    } catch (e: any) {
+        return res.json({
+            message: e.sqlMessage,
+        }).status(400);
+    }
+
+    const updatedPost = await conn.query('SELECT * FROM posts WHERE id = ?', [id]);
+
+    return res.json(updatedPost[0]).status(200);
 }
